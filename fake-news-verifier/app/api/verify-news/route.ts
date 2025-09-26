@@ -124,8 +124,11 @@ async function analyzeWithGroq(query: string, factCheckResults: Reference[]): Pr
   try {
     const groqApiKey = process.env.GROQ_API_KEY;
     if (!groqApiKey) {
+      console.log('GROQ_API_KEY not found in environment variables');
       return 'LLM analysis unavailable - API key not configured.';
     }
+    
+    console.log('GROQ_API_KEY found, length:', groqApiKey.length);
 
     const prompt = `Analyze this news claim for factual accuracy: "${query}"
 
@@ -133,7 +136,6 @@ Available fact-check information:
 ${factCheckResults.map(result => `- ${result.source}: ${result.title}`).join('\n')}
 
 Provide a brief analysis (2-3 sentences) of the claim's plausibility based on the available information and general knowledge. Include any red flags or supporting evidence. End with a disclaimer that this is AI analysis and should not be the sole basis for fact-checking.`;
-
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -147,14 +149,16 @@ Provide a brief analysis (2-3 sentences) of the claim's plausibility based on th
             content: prompt
           }
         ],
-        model: 'llama3-8b-8192',
+        model: 'llama-3.3-70b-versatile',
         temperature: 0.3,
         max_tokens: 500,
       }),
     });
-
+    console.log(prompt)
     if (!response.ok) {
-      console.log('Groq API request failed:', response.statusText);
+      const errorText = await response.text();
+      console.log('Groq API request failed:', response.status, response.statusText);
+      console.log('Error response:', errorText);
       return 'LLM analysis unavailable at this time.';
     }
 
@@ -163,6 +167,11 @@ Provide a brief analysis (2-3 sentences) of the claim's plausibility based on th
     return data.choices[0]?.message?.content || 'LLM analysis unavailable.';
   } catch (error) {
     console.error('Error with Groq analysis:', error);
+    console.error('Error details:', {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+      name: error instanceof Error ? error.name : undefined
+    });
     return 'LLM analysis unavailable due to technical issues.';
   }
 }
